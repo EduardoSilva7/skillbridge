@@ -5,7 +5,7 @@ set -euo pipefail
 # CONFIG (com defaults)
 # =========================
 SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-bf23da40-8f8a-4f42-980a-0497f40fe328}"
-LOCATION="${LOCATION:-brazilsouth}"             # mude para eastus/southcentralus se quiser
+LOCATION="${LOCATION:-brazilsouth}"             
 PREFIX="${PREFIX:-gs2025}"
 PROJECT="${PROJECT:-skillbridge}"
 ENV="${ENV:-dev}"
