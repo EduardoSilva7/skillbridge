@@ -6,7 +6,7 @@ set -euo pipefail
 # =========================
 SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-bf23da40-8f8a-4f42-980a-0497f40fe328}"
 
-# RG/Plan/WebApp ficam aqui:
+# RG/Plan/WebApp ficam nesta região
 LOCATION="${LOCATION:-brazilsouth}"
 
 PREFIX="${PREFIX:-gs2025}"
@@ -17,18 +17,18 @@ RG_NAME="${RG_NAME:-${PREFIX}-${PROJECT}-${ENV}-rg}"
 PLAN_NAME="${PLAN_NAME:-${PREFIX}-${PROJECT}-${ENV}-plan}"
 WEBAPP_NAME="${WEBAPP_NAME:-${PREFIX}-${PROJECT}-${ENV}-api}"
 
-# ----- MySQL: vamos criar em Canada Central por padrão -----
+# ----- MySQL: criaremos em Canada Central por padrão, com fallback -----
 MYSQL_LOCATION_PRIMARY="${MYSQL_LOCATION_PRIMARY:-canadacentral}"
 MYSQL_LOCATION_FALLBACK="${MYSQL_LOCATION_FALLBACK:-eastus}"
 
-MYSQL_SERVER="${MYSQL_SERVER:-${PREFIX}${PROJECT}${ENV}mysql}"   # sem hífen
+MYSQL_SERVER="${MYSQL_SERVER:-${PREFIX}${PROJECT}${ENV}mysql}"   
 MYSQL_DB="${MYSQL_DB:-appdb}"
 
 MYSQL_ADMIN_USER="${MYSQL_ADMIN_USER:-fiapadmin}"
 MYSQL_ADMIN_PASSWORD="${MYSQL_ADMIN_PASSWORD:-Fiap@2tds}"
+MYSQL_VERSION="${MYSQL_VERSION:-8.0.21}"  
 
-# SKUs fixos (sem checar list-skus)
-PLAN_SKU="${PLAN_SKU:-S1}"                  # App Service Plan (Linux)
+PLAN_SKU="${PLAN_SKU:-S1}"                       # App Service Plan Linux
 MYSQL_SKU_PRIMARY="${MYSQL_SKU_PRIMARY:-Standard_B1ms}"
 MYSQL_SKU_FALLBACK="${MYSQL_SKU_FALLBACK:-Standard_B2s}"
 
@@ -44,12 +44,12 @@ exists_db()      { az mysql flexible-server db show -g "$RG_NAME" -s "$MYSQL_SER
 
 create_mysql(){
   local loc="$1"; local sku="$2"
-  log "Tentando criar MySQL Flexible em '$loc' com SKU '$sku'..."
+  log "Tentando criar MySQL Flexible em '$loc' com SKU '$sku' (version $MYSQL_VERSION)..."
   set +e
   az mysql flexible-server create -g "$RG_NAME" -n "$MYSQL_SERVER" -l "$loc" \
-  --admin-user "$MYSQL_ADMIN_USER" --admin-password "$MYSQL_ADMIN_PASSWORD" \
-  --sku-name "$sku" --tier Burstable --storage-size 20 --version "$MYSQL_VERSION" \
-  --subscription "$SUBSCRIPTION_ID" --yes -o none
+    --admin-user "$MYSQL_ADMIN_USER" --admin-password "$MYSQL_ADMIN_PASSWORD" \
+    --sku-name "$sku" --tier Burstable --storage-size 20 --version "$MYSQL_VERSION" \
+    --subscription "$SUBSCRIPTION_ID" --yes -o none
   local rc=$?
   set -e
   return $rc
@@ -61,7 +61,7 @@ create_mysql(){
 log "Usando subscription: $SUBSCRIPTION_ID"
 az account set --subscription "$SUBSCRIPTION_ID"
 
-# 1) RG
+# 1) Resource Group
 if [[ "$(exists_rg)" != true ]]; then
   log "Criando Resource Group: $RG_NAME ($LOCATION)"
   az group create -n "$RG_NAME" -l "$LOCATION" -o none
@@ -109,15 +109,19 @@ else
   log "Database já existe: $MYSQL_DB"
 fi
 
-# 6) Firewall pro IP atual (best-effort)
+# 6) Firewall rule para IP atual (best-effort)
 if command -v curl >/dev/null 2>&1; then
   LOCAL_IP="$(curl -s https://ifconfig.me || echo 0.0.0.0)"
 else
   LOCAL_IP="0.0.0.0"
 fi
-log "Aplicando firewall rule para IP local: $LOCAL_IP (ignorar erro se não suportado)"
-az mysql flexible-server firewall-rule create -g "$RG_NAME" -s "$MYSQL_SERVER" \
-  -n "allow-local-ip" --start-ip-address "$LOCAL_IP" --end-ip-address "$LOCAL_IP" \
+log "Criando regra de firewall para IP local: $LOCAL_IP (ignorar erro se não suportado)"
+az mysql flexible-server firewall-rule create \
+  --resource-group "$RG_NAME" \
+  --name "$MYSQL_SERVER" \
+  --rule-name "allow-local-ip" \
+  --start-ip-address "$LOCAL_IP" \
+  --end-ip-address "$LOCAL_IP" \
   --subscription "$SUBSCRIPTION_ID" -o none || true
 
 # 7) App Settings no Web App
