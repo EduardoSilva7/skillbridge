@@ -1,21 +1,31 @@
 # azure-pipelines.yml
 trigger:
-  branches: { include: [ "main" ] }
+  branches:
+    include:
+      - main
 pr:
-  branches: { include: [ "main" ] }
+  branches:
+    include:
+      - main
 
 variables:
-  buildConfiguration: 'Release'
-  vmImage: 'ubuntu-latest'
-  artifactName: 'drop'
-  javaVersion: '17'
+- group: VG-SkillBridge-Dev           # <-- linka seu Variable Group (WEBAPP_NAME, SPRING_* etc.)
+- name: buildConfiguration
+  value: 'Release'
+- name: vmImage
+  value: 'ubuntu-latest'
+- name: artifactName
+  value: 'drop'
+- name: javaVersion
+  value: '17'
 
 stages:
 - stage: Build_Test_Publish
   displayName: "Build, Test and Publish"
   jobs:
   - job: Build
-    pool: { vmImage: $(vmImage) }
+    pool:
+      vmImage: $(vmImage)
     steps:
     - checkout: self
       persistCredentials: true
@@ -27,11 +37,12 @@ stages:
         goals: 'clean verify -DskipITs=false'
         options: '-Dmaven.test.failure.ignore=false'
         javaHomeOption: 'JDKVersion'
-        jdkVersionOption: '1.17'
+        jdkVersionOption: '1.17'          # JDK 17
         publishJUnitResults: true
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
         testRunTitle: 'JUnit Tests'
 
+    # (Opcional; mantém publicação explícita dos testes)
     - task: PublishTestResults@2
       displayName: 'Publish JUnit results'
       inputs:
@@ -65,13 +76,14 @@ stages:
         deploy:
           steps:
           - download: current
-            artifact: 'drop'
+            artifact: '$(artifactName)'
+
           - task: AzureWebApp@1
             displayName: 'Deploy to Azure Web App (Java SE)'
             inputs:
-              azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
-              appName: '$(WEBAPP_NAME)'
-              package: '$(Pipeline.Workspace)/drop/**/*.jar'
+              azureSubscription: 'SC-Azure-RM-SkillBridge'   # <-- NOME exato da sua Service Connection
+              appName: '$(WEBAPP_NAME)'                      # vem do Variable Group
+              package: '$(Pipeline.Workspace)/$(artifactName)/**/*.jar'
               runtimeStack: 'JAVA|17-java17'
               appSettings: |
                 -SPRING_PROFILES_ACTIVE=$(SPRING_PROFILES_ACTIVE)
