@@ -1,23 +1,22 @@
 # azure-pipelines.yml
 trigger:
   branches:
-    include:
-      - main
+    include: ["main"]
+
 pr:
   branches:
-    include:
-      - main
+    include: ["main"]
 
 variables:
-- group: VG-SkillBridge-Dev          
+- group: VG-SkillBridge-Dev
 - name: buildConfiguration
-  value: 'Release'
+  value: "Release"
 - name: vmImage
-  value: 'ubuntu-latest'
+  value: "ubuntu-latest"
 - name: artifactName
-  value: 'drop'
+  value: "drop"
 - name: javaVersion
-  value: '17'
+  value: "17"
 
 stages:
 - stage: Build_Test_Publish
@@ -25,42 +24,43 @@ stages:
   jobs:
   - job: Build
     pool:
-      vmImage: $(vmImage)
+      vmImage: "$(vmImage)"
     steps:
     - checkout: self
       persistCredentials: true
 
     - task: Maven@4
-      displayName: 'Maven Build & Test'
+      displayName: "Maven Build & Test"
       inputs:
-        mavenPomFile: 'pom.xml'
-        goals: 'clean verify -DskipITs=false'
-        options: '-Dmaven.test.failure.ignore=false'
-        javaHomeOption: 'JDKVersion'
-        jdkVersionOption: '1.17'          # JDK 17
-        publishJUnitResults: true
-        testResultsFiles: '**/surefire-reports/TEST-*.xml'
-        testRunTitle: 'JUnit Tests'
+        mavenPomFile: "pom.xml"
+        goals: "clean verify -DskipITs=false"
+        options: "-Dmaven.test.failure.ignore=false"
+        javaHomeOption: "JDKVersion"
+        jdkVersionOption: "1.17"
+        publishJUnitResults: false
 
     - task: PublishTestResults@2
-      displayName: 'Publish JUnit results'
+      displayName: "Publish JUnit results"
+      condition: always()
       inputs:
-        testResultsFormat: 'JUnit'
-        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        testResultsFormat: "JUnit"
+        testResultsFiles: "**/surefire-reports/TEST-*.xml"
         failTaskOnFailedTests: true
 
     - task: CopyFiles@2
-      displayName: 'Copy JAR to artifact staging'
+      displayName: "Copy JAR to artifact staging"
+      condition: succeeded()
       inputs:
-        contents: '**/target/*.jar'
-        targetFolder: '$(Build.ArtifactStagingDirectory)'
+        contents: "**/target/*.jar"
+        targetFolder: "$(Build.ArtifactStagingDirectory)"
 
     - task: PublishBuildArtifacts@1
-      displayName: 'Publish Artifact'
+      displayName: "Publish Artifact"
+      condition: succeeded()
       inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)'
-        artifactName: '$(artifactName)'
-        publishLocation: 'Container'
+        pathToPublish: "$(Build.ArtifactStagingDirectory)"
+        artifactName: "$(artifactName)"
+        publishLocation: "Container"
 
 - stage: Release_Deploy
   displayName: "Release: Deploy to Azure Web App"
@@ -69,21 +69,21 @@ stages:
   jobs:
   - deployment: DeployToWebApp
     displayName: "Deploy JAR to Azure Web App"
-    environment: 'dev'
+    environment: "dev"
     strategy:
       runOnce:
         deploy:
           steps:
           - download: current
-            artifact: '$(artifactName)'
+            artifact: "$(artifactName)"
 
           - task: AzureWebApp@1
-            displayName: 'Deploy to Azure Web App (Java SE)'
+            displayName: "Deploy to Azure Web App (Java SE)"
             inputs:
-              azureSubscription: 'SC-Azure-RM-SkillBridge'   
-              appName: '$(WEBAPP_NAME)'                     
-              package: '$(Pipeline.Workspace)/$(artifactName)/**/*.jar'
-              runtimeStack: 'JAVA|17-java17'
+              azureSubscription: "SC-Azure-RM-SkillBridge"
+              appName: "$(WEBAPP_NAME)"
+              package: "$(Pipeline.Workspace)/$(artifactName)/**/*.jar"
+              runtimeStack: "JAVA|17-java17"
               appSettings: |
                 -SPRING_PROFILES_ACTIVE=$(SPRING_PROFILES_ACTIVE)
                 -SPRING_DATASOURCE_URL=$(SPRING_DATASOURCE_URL)
