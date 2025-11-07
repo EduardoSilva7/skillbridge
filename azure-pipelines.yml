@@ -9,7 +9,7 @@ pr:
       - main
 
 variables:
-- group: VG-SkillBridge-Dev           # <-- linka seu Variable Group (WEBAPP_NAME, SPRING_* etc.)
+- group: VG-SkillBridge-Dev          
 - name: buildConfiguration
   value: 'Release'
 - name: vmImage
@@ -42,7 +42,6 @@ stages:
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
         testRunTitle: 'JUnit Tests'
 
-    # (Opcional; mantém publicação explícita dos testes)
     - task: PublishTestResults@2
       displayName: 'Publish JUnit results'
       inputs:
@@ -81,8 +80,8 @@ stages:
           - task: AzureWebApp@1
             displayName: 'Deploy to Azure Web App (Java SE)'
             inputs:
-              azureSubscription: 'SC-Azure-RM-SkillBridge'   # <-- NOME exato da sua Service Connection
-              appName: '$(WEBAPP_NAME)'                      # vem do Variable Group
+              azureSubscription: 'SC-Azure-RM-SkillBridge'   
+              appName: '$(WEBAPP_NAME)'                     
               package: '$(Pipeline.Workspace)/$(artifactName)/**/*.jar'
               runtimeStack: 'JAVA|17-java17'
               appSettings: |
