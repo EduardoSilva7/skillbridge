@@ -1,0 +1,80 @@
+# azure-pipelines.yml
+trigger:
+  branches: { include: [ "main" ] }
+pr:
+  branches: { include: [ "main" ] }
+
+variables:
+  buildConfiguration: 'Release'
+  vmImage: 'ubuntu-latest'
+  artifactName: 'drop'
+  javaVersion: '17'
+
+stages:
+- stage: Build_Test_Publish
+  displayName: "Build, Test and Publish"
+  jobs:
+  - job: Build
+    pool: { vmImage: $(vmImage) }
+    steps:
+    - checkout: self
+      persistCredentials: true
+
+    - task: Maven@4
+      displayName: 'Maven Build & Test'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'clean verify -DskipITs=false'
+        options: '-Dmaven.test.failure.ignore=false'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.17'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        testRunTitle: 'JUnit Tests'
+
+    - task: PublishTestResults@2
+      displayName: 'Publish JUnit results'
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        failTaskOnFailedTests: true
+
+    - task: CopyFiles@2
+      displayName: 'Copy JAR to artifact staging'
+      inputs:
+        contents: '**/target/*.jar'
+        targetFolder: '$(Build.ArtifactStagingDirectory)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact'
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: '$(artifactName)'
+        publishLocation: 'Container'
+
+- stage: Release_Deploy
+  displayName: "Release: Deploy to Azure Web App"
+  dependsOn: Build_Test_Publish
+  condition: succeeded()
+  jobs:
+  - deployment: DeployToWebApp
+    displayName: "Deploy JAR to Azure Web App"
+    environment: 'dev'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: 'drop'
+          - task: AzureWebApp@1
+            displayName: 'Deploy to Azure Web App (Java SE)'
+            inputs:
+              azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+              appName: '$(WEBAPP_NAME)'
+              package: '$(Pipeline.Workspace)/drop/**/*.jar'
+              runtimeStack: 'JAVA|17-java17'
+              appSettings: |
+                -SPRING_PROFILES_ACTIVE=$(SPRING_PROFILES_ACTIVE)
+                -SPRING_DATASOURCE_URL=$(SPRING_DATASOURCE_URL)
+                -SPRING_DATASOURCE_USERNAME=$(SPRING_DATASOURCE_USERNAME)
+                -SPRING_DATASOURCE_PASSWORD=$(SPRING_DATASOURCE_PASSWORD)
