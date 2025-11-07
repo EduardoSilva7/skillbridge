@@ -47,9 +47,9 @@ create_mysql(){
   log "Tentando criar MySQL Flexible em '$loc' com SKU '$sku'..."
   set +e
   az mysql flexible-server create -g "$RG_NAME" -n "$MYSQL_SERVER" -l "$loc" \
-    --admin-user "$MYSQL_ADMIN_USER" --admin-password "$MYSQL_ADMIN_PASSWORD" \
-    --sku-name "$sku" --tier Burstable --storage-size 20 --version 8.0 \
-    --subscription "$SUBSCRIPTION_ID" --yes -o none
+  --admin-user "$MYSQL_ADMIN_USER" --admin-password "$MYSQL_ADMIN_PASSWORD" \
+  --sku-name "$sku" --tier Burstable --storage-size 20 --version "$MYSQL_VERSION" \
+  --subscription "$SUBSCRIPTION_ID" --yes -o none
   local rc=$?
   set -e
   return $rc
